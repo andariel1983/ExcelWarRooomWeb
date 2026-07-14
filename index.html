@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ExcelWarRoom — Comando de inventario regulado</title>
+<meta name="description" content="ExcelWarRoom: gestión de inventario de efectos regulados por SIDIGEA. Importación automática, reportes de estado de mantenimiento y licenciamiento offline.">
+<style>
+  /* ================= EWR LANDING — TOKENS ================= */
+  .ewr-landing{
+    /* identidad "consola táctica" — celeste logística + verde oliva ocasional */
+    --ewr-bg:#050b13;
+    --ewr-bg-panel:#0b1622;
+    --ewr-bg-panel-2:#101f30;
+    --ewr-ink:#e9f4fa;
+    --ewr-muted:#7d9bad;
+    --ewr-blue:#31c1ef;
+    --ewr-blue-deep:#0e6fae;
+    --ewr-blue-bright:#8fe6ff;
+    --ewr-olive:#93a94f;
+    --ewr-olive-deep:#5c6b34;
+    --ewr-line:rgba(49,193,239,.20);
+    --ewr-good:#43b487;
+    --ewr-warn:#d69a3e;
+    --ewr-critical:#e2645a;
+    --ewr-shadow:rgba(3,10,20,.6);
+    --ewr-gradient:linear-gradient(135deg,var(--ewr-blue) 0%,var(--ewr-blue-deep) 100%);
+    --ewr-gradient-wa:linear-gradient(135deg,#35c76e 0%,var(--ewr-olive-deep) 100%);
+
+    --ewr-font-display:"Bahnschrift","Segoe UI Semibold","DIN Alternate","Arial Narrow",sans-serif;
+    --ewr-font-body:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --ewr-font-mono:"Cascadia Code","SF Mono",Consolas,"Liberation Mono",monospace;
+  }
+  @media (prefers-color-scheme:light){
+    .ewr-landing{
+      --ewr-bg:#eef7fb;
+      --ewr-bg-panel:#ffffff;
+      --ewr-bg-panel-2:#dcedf5;
+      --ewr-ink:#0a2233;
+      --ewr-muted:#4c6b7c;
+      --ewr-blue:#0e86bf;
+      --ewr-blue-deep:#0a5883;
+      --ewr-blue-bright:#0aa3d6;
+      --ewr-olive:#657a34;
+      --ewr-olive-deep:#465524;
+      --ewr-line:rgba(14,134,191,.18);
+      --ewr-good:#1f8a5f;
+      --ewr-warn:#a06a1f;
+      --ewr-critical:#b6392f;
+      --ewr-shadow:rgba(10,34,51,.14);
+    }
+  }
+  :root[data-theme="dark"] .ewr-landing{
+    --ewr-bg:#050b13;--ewr-bg-panel:#0b1622;--ewr-bg-panel-2:#101f30;
+    --ewr-ink:#e9f4fa;--ewr-muted:#7d9bad;--ewr-blue:#31c1ef;--ewr-blue-deep:#0e6fae;--ewr-blue-bright:#8fe6ff;
+    --ewr-olive:#93a94f;--ewr-olive-deep:#5c6b34;--ewr-line:rgba(49,193,239,.20);
+    --ewr-good:#43b487;--ewr-warn:#d69a3e;--ewr-critical:#e2645a;--ewr-shadow:rgba(3,10,20,.6);
+  }
+  :root[data-theme="light"] .ewr-landing{
+    --ewr-bg:#eef7fb;--ewr-bg-panel:#ffffff;--ewr-bg-panel-2:#dcedf5;
+    --ewr-ink:#0a2233;--ewr-muted:#4c6b7c;--ewr-blue:#0e86bf;--ewr-blue-deep:#0a5883;--ewr-blue-bright:#0aa3d6;
+    --ewr-olive:#657a34;--ewr-olive-deep:#465524;--ewr-line:rgba(14,134,191,.18);
+    --ewr-good:#1f8a5f;--ewr-warn:#a06a1f;--ewr-critical:#b6392f;--ewr-shadow:rgba(10,34,51,.14);
+  }
+
+  /* ================= RESET ================= */
+  *,*::before,*::after{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  .ewr-landing{
+    position:relative;background:var(--ewr-bg);color:var(--ewr-ink);
+    font-family:var(--ewr-font-body);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden;
+    min-height:100vh;
+  }
+  .ewr-landing h1,.ewr-landing h2,.ewr-landing h3,.ewr-landing p,.ewr-landing ul,.ewr-landing figure{margin:0;}
+  .ewr-landing ul{padding:0;list-style:none;}
+  .ewr-landing a{color:inherit;text-decoration:none;}
+  .ewr-landing img,.ewr-landing svg{display:block;max-width:100%;}
+  .ewr-landing button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;}
+  .ewr-landing input,.ewr-landing textarea{font:inherit;}
+  .ewr-landing h1,.ewr-landing h2,.ewr-landing h3{text-wrap:balance;font-family:var(--ewr-font-display);font-weight:600;letter-spacing:.01em;}
+  .ewr-landing :focus-visible{outline:2px solid var(--ewr-blue-bright);outline-offset:3px;}
+  @media (prefers-reduced-motion:reduce){
+    .ewr-landing *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;scroll-behavior:auto !important;}
+  }
+
+  /* ================= LAYOUT PRIMITIVES ================= */
+  .ewr-container{max-width:1180px;margin:0 auto;padding-inline:clamp(20px,4vw,48px);}
+  .ewr-eyebrow{
+    display:inline-flex;align-items:center;gap:.5em;
+    font-family:var(--ewr-font-mono);font-size:.72rem;font-weight:600;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--ewr-blue);
+  }
+  .ewr-eyebrow::before{content:"";width:18px;height:1px;background:var(--ewr-blue);display:inline-block;}
+  .ewr-eyebrow.is-olive{color:var(--ewr-olive);}
+  .ewr-eyebrow.is-olive::before{background:var(--ewr-olive);}
+  .ewr-section{padding-block:clamp(56px,9vw,108px);border-top:1px solid var(--ewr-line);}
+  .ewr-section-head{max-width:640px;display:flex;flex-direction:column;gap:14px;margin-bottom:clamp(32px,5vw,56px);}
+  .ewr-section-head h2{font-size:clamp(1.6rem,2.6vw,2.15rem);line-height:1.15;}
+  .ewr-section-head p{color:var(--ewr-muted);font-size:1.02rem;max-width:56ch;}
+
+  /* ================= TOPBAR ================= */
+  .ewr-topbar{
+    position:relative;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:24px;
+    padding-block:20px;border-bottom:1px solid var(--ewr-line);
+  }
+  .ewr-brand{display:flex;align-items:center;gap:12px;}
+  .ewr-seal{width:38px;height:38px;flex:none;}
+  .ewr-wordmark{font-family:var(--ewr-font-display);font-size:1.18rem;letter-spacing:.02em;}
+  .ewr-wordmark strong{color:var(--ewr-blue-bright);}
+  .ewr-nav{display:flex;align-items:center;gap:clamp(16px,2.4vw,32px);}
+  .ewr-nav-links{display:flex;gap:clamp(14px,2vw,28px);}
+  .ewr-nav-links a{font-size:.9rem;color:var(--ewr-muted);white-space:nowrap;}
+  .ewr-nav-links a:hover{color:var(--ewr-ink);}
+  @media (max-width:760px){.ewr-nav-links{display:none;}}
+
+  .ewr-btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:.5em;
+    padding:.8em 1.5em;font-size:.92rem;font-weight:600;letter-spacing:.01em;
+    border:1px solid transparent;white-space:nowrap;transition:box-shadow .2s,transform .2s;
+  }
+  .ewr-btn-solid{background:var(--ewr-gradient);color:#04141c;}
+  .ewr-btn-solid:hover{box-shadow:0 0 0 4px rgba(49,193,239,.22);transform:translateY(-1px);}
+  .ewr-btn-ghost{color:var(--ewr-ink);border-color:var(--ewr-line);}
+  .ewr-btn-ghost:hover{border-color:var(--ewr-blue);color:var(--ewr-blue-bright);}
+
+  /* ================= HERO ================= */
+  .ewr-hero{position:relative;padding-block:clamp(56px,9vw,104px);overflow:hidden;}
+  .ewr-hero::before{
+    content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+    background-image:
+      linear-gradient(var(--ewr-line) 1px,transparent 1px),
+      linear-gradient(90deg,var(--ewr-line) 1px,transparent 1px);
+    background-size:64px 64px;
+    -webkit-mask-image:radial-gradient(ellipse 70% 60% at 30% 20%,#000 0%,transparent 75%);
+    mask-image:radial-gradient(ellipse 70% 60% at 30% 20%,#000 0%,transparent 75%);
+    opacity:.6;
+  }
+  .ewr-glow{position:absolute;z-index:0;pointer-events:none;border-radius:50%;filter:blur(6px);}
+  .ewr-glow-a{width:520px;height:520px;right:-140px;top:-180px;background:radial-gradient(circle at center,rgba(49,193,239,.32),transparent 70%);}
+  .ewr-glow-b{width:380px;height:380px;left:-120px;bottom:-160px;background:radial-gradient(circle at center,rgba(147,169,79,.24),transparent 70%);}
+  .ewr-hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(32px,5vw,64px);align-items:start;}
+  @media (max-width:900px){.ewr-hero-grid{grid-template-columns:1fr;}}
+
+  .ewr-hero-copy{display:flex;flex-direction:column;gap:22px;padding-top:8px;}
+  .ewr-hero-copy h1{font-size:clamp(2.15rem,4.4vw,3.35rem);line-height:1.08;}
+  .ewr-hero-copy h1.ewr-shout-title{text-transform:uppercase;font-size:clamp(1.5rem,3.4vw,2.55rem);line-height:1.24;}
+  .ewr-hero-copy h1 em{
+    font-style:normal;color:var(--ewr-blue-bright);
+    background:var(--ewr-gradient);background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  }
+  @supports not ((-webkit-background-clip:text) or (background-clip:text)){
+    .ewr-hero-copy h1 em{color:var(--ewr-blue-bright);background:none;-webkit-text-fill-color:currentColor;}
+  }
+  .ewr-grad-text{
+    background:var(--ewr-gradient);background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  }
+  @supports not ((-webkit-background-clip:text) or (background-clip:text)){
+    .ewr-grad-text{color:var(--ewr-blue-bright);background:none;-webkit-text-fill-color:currentColor;}
+  }
+  .ewr-hero-lede{font-size:1.08rem;color:var(--ewr-muted);max-width:52ch;}
+  .ewr-hero-actions{display:flex;flex-wrap:wrap;gap:14px;margin-top:6px;}
+  .ewr-hero-trust{
+    display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--ewr-muted);
+    padding-top:18px;margin-top:6px;border-top:1px solid var(--ewr-line);
+  }
+  .ewr-hero-trust svg{flex:none;color:var(--ewr-blue);}
+
+  /* ---- panel de lectura (mock del reporte) ---- */
+  .ewr-readout{position:relative;background:var(--ewr-bg-panel);border:1px solid var(--ewr-line);box-shadow:0 24px 60px -20px var(--ewr-shadow);}
+  .ewr-readout-bar{
+    position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:12px 18px;border-bottom:1px solid var(--ewr-line);overflow:hidden;
+    font-family:var(--ewr-font-mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ewr-muted);
+  }
+  .ewr-readout-bar::after{
+    content:"";position:absolute;left:0;top:0;height:2px;width:40%;
+    background:var(--ewr-gradient);animation:ewrScan 3.4s ease-in-out infinite;
+  }
+  @keyframes ewrScan{0%{left:-40%;}100%{left:100%;}}
+  .ewr-readout-bar .ewr-dot{width:7px;height:7px;border-radius:50%;background:var(--ewr-blue);display:inline-block;margin-right:8px;}
+  .ewr-readout-body{padding:18px;display:flex;flex-direction:column;gap:16px;}
+  .ewr-stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;background:var(--ewr-line);border:1px solid var(--ewr-line);}
+  .ewr-stat{background:var(--ewr-bg-panel);padding:14px 16px;}
+  .ewr-stat .ewr-stat-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--ewr-muted);}
+  .ewr-stat .ewr-stat-value{font-family:var(--ewr-font-mono);font-variant-numeric:tabular-nums;font-size:clamp(1.4rem,2.6vw,1.85rem);font-weight:700;margin-top:4px;color:var(--ewr-ink);}
+  .ewr-stat .ewr-stat-value.is-accent{color:var(--ewr-blue-bright);}
+
+  .ewr-donut-row{display:flex;align-items:center;gap:18px;}
+  .ewr-donut{width:82px;height:82px;flex:none;}
+  .ewr-donut circle{transition:stroke-dasharray .3s;}
+  .ewr-donut-legend{display:flex;flex-direction:column;gap:7px;flex:1;min-width:0;}
+  .ewr-donut-legend li{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .ewr-donut-pct{font-family:var(--ewr-font-mono);font-size:.78rem;color:var(--ewr-muted);font-variant-numeric:tabular-nums;flex:none;}
+
+  .ewr-mini-table{width:100%;border-collapse:collapse;font-size:.78rem;}
+  .ewr-mini-table th,.ewr-mini-table td{padding:8px 6px;border-bottom:1px solid var(--ewr-line);text-align:left;}
+  .ewr-mini-table th{font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ewr-muted);font-weight:600;}
+  .ewr-mini-table td.ewr-code{font-family:var(--ewr-font-mono);color:var(--ewr-blue-bright);white-space:nowrap;}
+  .ewr-mini-table tr:last-child td{border-bottom:0;}
+  .ewr-pill{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:.76rem;}
+  .ewr-pill::before{content:"";width:7px;height:7px;border-radius:50%;flex:none;}
+  .ewr-pill.is-good{color:var(--ewr-good);}
+  .ewr-pill.is-good::before{background:var(--ewr-good);}
+  .ewr-pill.is-warn{color:var(--ewr-warn);}
+  .ewr-pill.is-warn::before{background:var(--ewr-warn);}
+  .ewr-pill.is-critical{color:var(--ewr-critical);}
+  .ewr-pill.is-critical::before{background:var(--ewr-critical);}
+  .ewr-readout-note{font-size:.72rem;color:var(--ewr-muted);text-align:right;font-style:italic;}
+
+  /* ================= PROBLEMA ================= */
+  .ewr-pain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ewr-line);border:1px solid var(--ewr-line);}
+  @media (max-width:860px){.ewr-pain-grid{grid-template-columns:1fr;}}
+  .ewr-pain{background:var(--ewr-bg);padding:clamp(22px,3vw,32px);display:flex;flex-direction:column;gap:12px;}
+  .ewr-pain-kicker{font-family:var(--ewr-font-mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ewr-critical);}
+  .ewr-pain-kicker.is-accent{color:var(--ewr-blue);}
+  .ewr-pain h3{font-size:1.12rem;}
+  .ewr-pain p{color:var(--ewr-muted);font-size:.95rem;}
+
+  /* ================= PROCESO (secuencia real) ================= */
+  .ewr-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;position:relative;}
+  @media (max-width:860px){.ewr-steps{grid-template-columns:1fr;}}
+  .ewr-step{position:relative;padding:0 clamp(18px,2.4vw,28px) 0 0;display:flex;flex-direction:column;gap:10px;}
+  .ewr-step:not(:last-child){border-right:1px dashed var(--ewr-line);}
+  @media (max-width:860px){.ewr-step:not(:last-child){border-right:0;border-bottom:1px dashed var(--ewr-line);padding-bottom:24px;margin-bottom:24px;}}
+  .ewr-step-index{font-family:var(--ewr-font-mono);font-size:.75rem;color:var(--ewr-olive);display:flex;align-items:center;gap:10px;}
+  .ewr-step-index::after{content:"";flex:1;height:1px;background:var(--ewr-line);}
+  .ewr-step h3{font-size:1.15rem;}
+  .ewr-step p{color:var(--ewr-muted);font-size:.94rem;}
+
+  /* ================= FUNCIONALIDADES ================= */
+  .ewr-feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ewr-line);border:1px solid var(--ewr-line);}
+  @media (max-width:900px){.ewr-feature-grid{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:560px){.ewr-feature-grid{grid-template-columns:1fr;}}
+  .ewr-feature{background:var(--ewr-bg);padding:clamp(22px,2.6vw,28px);display:flex;flex-direction:column;gap:12px;}
+  .ewr-feature svg{width:22px;height:22px;color:var(--ewr-blue);}
+  .ewr-feature h3{font-size:1.02rem;font-family:var(--ewr-font-body);font-weight:700;}
+  .ewr-feature p{font-size:.92rem;color:var(--ewr-muted);}
+
+  /* ================= PANELES (presupuesto / seguridad) ================= */
+  .ewr-panel{
+    display:grid;grid-template-columns:.7fr 1.3fr;gap:clamp(28px,4vw,48px);align-items:center;
+    background:var(--ewr-bg-panel);border:1px solid var(--ewr-line);padding:clamp(28px,4vw,44px);
+  }
+  @media (max-width:800px){.ewr-panel{grid-template-columns:1fr;text-align:left;}}
+  .ewr-panel .ewr-seal{width:92px;height:92px;margin:0 auto;}
+  .ewr-panel-copy{display:flex;flex-direction:column;gap:14px;}
+  .ewr-panel-copy h2{font-size:clamp(1.4rem,2.2vw,1.8rem);}
+  .ewr-panel-copy p{color:var(--ewr-muted);}
+  .ewr-panel-list{display:flex;flex-direction:column;gap:10px;margin-top:6px;}
+  .ewr-panel-list li{display:flex;gap:10px;font-size:.94rem;align-items:flex-start;}
+  .ewr-panel-list svg{flex:none;width:16px;height:16px;margin-top:3px;color:var(--ewr-good);}
+  .ewr-panel-cta{margin-top:6px;}
+
+  /* ================= CONTACTO / FORMULARIO ================= */
+  .ewr-contact-grid{display:grid;grid-template-columns:1.3fr .8fr;gap:clamp(24px,3vw,40px);align-items:start;}
+  @media (max-width:820px){.ewr-contact-grid{grid-template-columns:1fr;}}
+  .ewr-form{display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--ewr-bg-panel);border:1px solid var(--ewr-line);padding:clamp(20px,3vw,28px);}
+  @media (max-width:540px){.ewr-form{grid-template-columns:1fr;}}
+  .ewr-field{display:flex;flex-direction:column;gap:6px;}
+  .ewr-field-wide{grid-column:1/-1;}
+  .ewr-field label{font-size:.74rem;text-transform:uppercase;letter-spacing:.07em;color:var(--ewr-muted);font-weight:600;}
+  .ewr-field input,.ewr-field textarea{
+    background:var(--ewr-bg-panel-2);border:1px solid var(--ewr-line);color:var(--ewr-ink);
+    padding:.75em .9em;font-size:.95rem;
+  }
+  .ewr-field input::placeholder,.ewr-field textarea::placeholder{color:var(--ewr-muted);opacity:.8;}
+  .ewr-field input:focus,.ewr-field textarea:focus{outline:none;border-color:var(--ewr-blue);box-shadow:0 0 0 3px rgba(49,193,239,.18);}
+  .ewr-field textarea{resize:vertical;min-height:88px;}
+  .ewr-form-submit{justify-self:start;margin-top:4px;}
+
+  .ewr-contact-info{display:flex;flex-direction:column;gap:16px;padding:clamp(20px,3vw,28px);background:var(--ewr-bg-panel);border:1px solid var(--ewr-line);height:100%;}
+  .ewr-contact-info h3{font-family:var(--ewr-font-body);font-size:1rem;font-weight:700;}
+  .ewr-contact-line{display:flex;align-items:center;gap:10px;font-family:var(--ewr-font-mono);font-size:.9rem;padding:10px 0;border-top:1px solid var(--ewr-line);}
+  .ewr-contact-line:first-of-type{border-top:0;}
+  .ewr-contact-line svg{width:18px;height:18px;color:var(--ewr-blue);flex:none;}
+  .ewr-contact-line:hover{color:var(--ewr-blue-bright);}
+  .ewr-contact-note{font-size:.82rem;color:var(--ewr-muted);border-top:1px solid var(--ewr-line);padding-top:14px;}
+
+  /* ================= FOOTER ================= */
+  .ewr-footer{
+    border-top:1px solid var(--ewr-line);padding-block:28px;
+    display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;
+    font-size:.82rem;color:var(--ewr-muted);
+  }
+  .ewr-footer .ewr-brand .ewr-seal{width:26px;height:26px;}
+  .ewr-footer .ewr-brand span{font-family:var(--ewr-font-mono);font-size:.78rem;letter-spacing:.04em;}
+  .ewr-footer-links{display:flex;gap:18px;flex-wrap:wrap;}
+  .ewr-footer-links a:hover{color:var(--ewr-blue-bright);}
+
+  /* ================= BOTÓN FLOTANTE WHATSAPP ================= */
+  .ewr-float-wa{
+    position:fixed;right:22px;bottom:22px;z-index:60;
+    width:60px;height:60px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--ewr-gradient-wa);
+    box-shadow:0 10px 30px -8px rgba(0,0,0,.5);
+    animation:ewrPulse 2.6s ease-out infinite;
+  }
+  .ewr-float-wa svg{width:30px;height:30px;}
+  @keyframes ewrPulse{
+    0%{box-shadow:0 10px 30px -8px rgba(0,0,0,.5),0 0 0 0 rgba(53,199,110,.45);}
+    70%{box-shadow:0 10px 30px -8px rgba(0,0,0,.5),0 0 0 16px rgba(53,199,110,0);}
+    100%{box-shadow:0 10px 30px -8px rgba(0,0,0,.5),0 0 0 0 rgba(53,199,110,0);}
+  }
+  @media (prefers-reduced-motion:reduce){.ewr-float-wa{animation:none;}}
+</style>
+</head>
+<body>
+<div class="ewr-landing">
+
+  <header class="ewr-topbar ewr-container">
+    <div class="ewr-brand">
+      <svg class="ewr-seal" viewBox="0 0 48 48" role="img" aria-label="Emblema ExcelWarRoom">
+        <circle cx="24" cy="24" r="22" fill="var(--ewr-bg-panel-2)" stroke="var(--ewr-blue)" stroke-width="2"/>
+        <circle cx="24" cy="24" r="16.5" fill="none" stroke="var(--ewr-blue)" stroke-width="1"/>
+        <line x1="24" y1="10" x2="24" y2="14" stroke="var(--ewr-blue)" stroke-width="1.4"/>
+        <line x1="24" y1="34" x2="24" y2="38" stroke="var(--ewr-blue)" stroke-width="1.4"/>
+        <line x1="10" y1="24" x2="14" y2="24" stroke="var(--ewr-blue)" stroke-width="1.4"/>
+        <line x1="34" y1="24" x2="38" y2="24" stroke="var(--ewr-blue)" stroke-width="1.4"/>
+        <text x="24" y="29" text-anchor="middle" font-family="var(--ewr-font-display)" font-size="14" fill="var(--ewr-blue-bright)">EW</text>
+      </svg>
+      <span class="ewr-wordmark">Excel<strong>WarRoom</strong></span>
+    </div>
+    <nav class="ewr-nav">
+      <div class="ewr-nav-links">
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#funcionalidades">Funcionalidades</a>
+        <a href="#presupuesto">Presupuesto</a>
+        <a href="#seguridad">Seguridad</a>
+        <a href="#calidad">Calidad</a>
+      </div>
+      <a class="ewr-btn ewr-btn-ghost" href="https://drive.google.com/drive/folders/1OfHLlCX8FF8tr-709j1pzQ2uczSXk68P?usp=drive_link" target="_blank" rel="noopener">Descargar</a>
+      <a class="ewr-btn ewr-btn-solid" href="#contacto">Solicitar demo</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="ewr-hero ewr-container" id="inicio">
+      <div class="ewr-glow ewr-glow-a" aria-hidden="true"></div>
+      <div class="ewr-glow ewr-glow-b" aria-hidden="true"></div>
+      <div class="ewr-hero-grid">
+        <div class="ewr-hero-copy">
+          <span class="ewr-eyebrow">Gestión de inventario de efectos regulados</span>
+          <h1 class="ewr-shout-title">¿Cansado de gastar horas, semanas y hasta meses en tener el estado de mantenimiento actualizado <em>—y que, justo cuando terminás, el estado de las unidades ya cambió?</em></h1>
+          <p class="ewr-hero-lede">
+            Tu asistente perfecto para presentaciones, inspecciones y revistas.
+            <strong class="ewr-grad-text">Elegante, institucional y moderno</strong> —
+            muy por encima de los clásicos gráficos de torta de Excel.
+          </p>
+          <div class="ewr-hero-actions">
+            <a class="ewr-btn ewr-btn-solid" href="#contacto">Solicitar una demostración</a>
+            <a class="ewr-btn ewr-btn-ghost" href="https://drive.google.com/drive/folders/1OfHLlCX8FF8tr-709j1pzQ2uczSXk68P?usp=drive_link" target="_blank" rel="noopener">Descargar el programa</a>
+          </div>
+          <div class="ewr-hero-trust">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="16" height="10" rx="0"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+            Pensado para unidades y brigadas que operan bajo el estándar SIDIGEA.
+          </div>
+        </div>
+
+        <aside class="ewr-readout" aria-label="Vista previa ilustrativa del reporte">
+          <div class="ewr-readout-bar">
+            <span><span class="ewr-dot"></span>Parte de mantenimiento</span>
+            <span>Ejemplo ilustrativo</span>
+          </div>
+          <div class="ewr-readout-body">
+            <div class="ewr-stat-grid">
+              <div class="ewr-stat">
+                <div class="ewr-stat-label">Total de efectos</div>
+                <div class="ewr-stat-value" data-count="1248">0</div>
+              </div>
+              <div class="ewr-stat">
+                <div class="ewr-stat-label">En servicio</div>
+                <div class="ewr-stat-value is-accent" data-count="812">0</div>
+              </div>
+              <div class="ewr-stat">
+                <div class="ewr-stat-label">Fuera de servicio</div>
+                <div class="ewr-stat-value" data-count="401">0</div>
+              </div>
+              <div class="ewr-stat">
+                <div class="ewr-stat-label">Act. administrativa</div>
+                <div class="ewr-stat-value" data-count="35">0</div>
+              </div>
+            </div>
+
+            <div class="ewr-donut-row">
+              <svg class="ewr-donut" viewBox="0 0 42 42" role="img" aria-label="Distribución ilustrativa del estado de mantenimiento">
+                <circle cx="21" cy="21" r="15.9155" fill="none" stroke="var(--ewr-line)" stroke-width="6"/>
+                <circle cx="21" cy="21" r="15.9155" fill="none" stroke="var(--ewr-good)" stroke-width="6" stroke-dasharray="65.1 34.9" stroke-dashoffset="25"/>
+                <circle cx="21" cy="21" r="15.9155" fill="none" stroke="var(--ewr-critical)" stroke-width="6" stroke-dasharray="32.1 67.9" stroke-dashoffset="-40.1"/>
+                <circle cx="21" cy="21" r="15.9155" fill="none" stroke="var(--ewr-warn)" stroke-width="6" stroke-dasharray="2.8 97.2" stroke-dashoffset="-72.2"/>
+              </svg>
+              <ul class="ewr-donut-legend">
+                <li><span class="ewr-pill is-good">En servicio</span><span class="ewr-donut-pct">65%</span></li>
+                <li><span class="ewr-pill is-critical">Fuera de servicio</span><span class="ewr-donut-pct">32%</span></li>
+                <li><span class="ewr-pill is-warn">Act. administrativa</span><span class="ewr-donut-pct">3%</span></li>
+              </ul>
+            </div>
+
+            <table class="ewr-mini-table">
+              <thead>
+                <tr><th>Código</th><th>Unidad</th><th>Estado</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="ewr-code">DEMO-04582</td>
+                  <td>Br. Log. II</td>
+                  <td><span class="ewr-pill is-good">Operativo</span></td>
+                </tr>
+                <tr>
+                  <td class="ewr-code">DEMO-11930</td>
+                  <td>Un. Transp. 4</td>
+                  <td><span class="ewr-pill is-warn">Atención</span></td>
+                </tr>
+                <tr>
+                  <td class="ewr-code">DEMO-07714</td>
+                  <td>Br. Log. II</td>
+                  <td><span class="ewr-pill is-critical">Crítico</span></td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="ewr-readout-note">Datos ficticios, solo para fines de muestra visual.</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="ewr-section ewr-container" id="problema">
+      <div class="ewr-section-head">
+        <span class="ewr-eyebrow">El problema</span>
+        <h2>El Excel regulatorio no fue pensado para gestionarse a mano.</h2>
+        <p>Tres fricciones que se repiten cada vez que llega un parte nuevo del sistema regulatorio.</p>
+      </div>
+      <div class="ewr-pain-grid">
+        <article class="ewr-pain">
+          <span class="ewr-pain-kicker">El tiempo</span>
+          <h3>Horas de control manual, cada mes</h3>
+          <p>Revisar unidad por unidad, contar a mano cuántos efectos están en servicio y cuáles no: horas de control repetitivo que podrían destinarse a otra tarea.</p>
+        </article>
+        <article class="ewr-pain">
+          <span class="ewr-pain-kicker">El error</span>
+          <h3>Un dato mal tipeado, un reporte mal armado</h3>
+          <p>Copiar y pegar a mano abre la puerta a errores silenciosos: una celda corrida, un total mal sumado, un efecto que queda afuera sin que nadie lo note a tiempo.</p>
+        </article>
+        <article class="ewr-pain">
+          <span class="ewr-pain-kicker">El informe</span>
+          <h3>El parte se arma de cero, cada vez</h3>
+          <p>Sin un sistema que ordene cuentas, unidades y grupos automáticamente, armar el parte de estado significa reconstruir toda la planilla cada vez que llega un archivo nuevo.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="ewr-section ewr-container" id="como-funciona">
+      <div class="ewr-section-head">
+        <span class="ewr-eyebrow is-olive">Cómo funciona</span>
+        <h2>Tres pasos, de archivo crudo a parte firmable.</h2>
+      </div>
+      <div class="ewr-steps">
+        <div class="ewr-step">
+          <span class="ewr-step-index">01</span>
+          <h3>Importar</h3>
+          <p>Cargás el archivo tal como lo entrega el sistema regulatorio. ExcelWarRoom lo interpreta y sincroniza cuentas, unidades y grupos de comodidad automáticamente.</p>
+        </div>
+        <div class="ewr-step">
+          <span class="ewr-step-index">02</span>
+          <h3>Verificar</h3>
+          <p>Los efectos que llegan a cantidad cero se dan de baja solos; los nuevos se dan de alta. Cada efecto queda identificado por código y grupo, sin duplicados.</p>
+        </div>
+        <div class="ewr-step">
+          <span class="ewr-step-index">03</span>
+          <h3>Reportar</h3>
+          <p>Generás el parte de estado de mantenimiento por unidad — en servicio, fuera de servicio, actuación administrativa — listo para exportar o imprimir.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="ewr-section ewr-container" id="funcionalidades">
+      <div class="ewr-section-head">
+        <span class="ewr-eyebrow">Funcionalidades</span>
+        <h2>Todo lo que hoy se hace a mano, en un solo lugar.</h2>
+      </div>
+      <div class="ewr-feature-grid">
+        <article class="ewr-feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><line x1="4" y1="20" x2="20" y2="20"/></svg>
+          <h3>Importación directa del parte regulatorio</h3>
+          <p>Lee el archivo HTML/XLS de SIDIGEA sin conversiones manuales previas.</p>
+        </article>
+        <article class="ewr-feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="12" height="8" rx="0"/><rect x="9" y="12" width="12" height="8" rx="0"/></svg>
+          <h3>Identidad correcta por efecto</h3>
+          <p>Cada efecto se identifica por código y grupo de comodidad, sin pisar ni duplicar registros.</p>
+        </article>
+        <article class="ewr-feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="12" width="4" height="8"/><rect x="10" y="7" width="4" height="13"/><rect x="16" y="3" width="4" height="17"/></svg>
+          <h3>Reportes de estado por unidad</h3>
+          <p>En servicio, fuera de servicio y actuación administrativa, con el detalle visual listo para presentar.</p>
+        </article>
+        <article class="ewr-feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg>
+          <h3>Base de datos local</h3>
+          <p>La información vive en el equipo. No depende de conexión a internet para operar.</p>
+        </article>
+        <article class="ewr-feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="11" width="14" height="9"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          <h3>Licenciamiento atado al equipo</h3>
+          <p>Activación offline por huella de hardware, con control de fecha anti-retroceso.</p>
+        </article>
+        <article class="ewr-feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          <h3>Cuentas, unidades y grupos en un solo lugar</h3>
+          <p>Gestión centralizada de toda la estructura administrativa, sin planillas sueltas.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="ewr-section ewr-container" id="presupuesto">
+      <div class="ewr-panel">
+        <svg class="ewr-seal" viewBox="0 0 48 48" role="img" aria-label="Presupuesto a medida">
+          <circle cx="24" cy="24" r="22" fill="var(--ewr-bg-panel-2)" stroke="var(--ewr-blue)" stroke-width="2"/>
+          <circle cx="24" cy="24" r="16.5" fill="none" stroke="var(--ewr-blue)" stroke-width="1"/>
+          <path d="M15 14h8l9 9-11 11a2.3 2.3 0 0 1-3.2 0L9 25.2A2.3 2.3 0 0 1 9 22z" fill="none" stroke="var(--ewr-blue-bright)" stroke-width="1.6" stroke-linejoin="round"/>
+          <circle cx="19" cy="19" r="1.6" fill="var(--ewr-blue-bright)"/>
+        </svg>
+        <div class="ewr-panel-copy">
+          <span class="ewr-eyebrow">Presupuesto</span>
+          <h2>Sin planes cerrados: se arma a tu medida.</h2>
+          <p>El costo se negocia según la cantidad de efectos que gestione tu unidad. Contanos cuántos equipos tenés y armamos una propuesta acorde.</p>
+          <ul class="ewr-panel-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>El presupuesto se ajusta a la cantidad de efectos a gestionar</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Instalación en el equipo de tu unidad, sin dependencias externas</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Mientras la licencia esté vigente, accedés a las actualizaciones y a las nuevas funcionalidades que se vayan sumando</li>
+          </ul>
+          <a class="ewr-btn ewr-btn-solid ewr-panel-cta" href="#contacto">Pedir presupuesto</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="ewr-section ewr-container" id="seguridad">
+      <div class="ewr-panel">
+        <svg class="ewr-seal" viewBox="0 0 48 48" role="img" aria-label="Sello de seguridad">
+          <circle cx="24" cy="24" r="22" fill="var(--ewr-bg-panel-2)" stroke="var(--ewr-olive)" stroke-width="2"/>
+          <circle cx="24" cy="24" r="16.5" fill="none" stroke="var(--ewr-olive)" stroke-width="1"/>
+          <path d="M24 14l3 6 6 1-4.5 4.5L29.5 32 24 28.5 18.5 32l1-6.5L15 21l6-1z" fill="var(--ewr-olive)"/>
+        </svg>
+        <div class="ewr-panel-copy">
+          <span class="ewr-eyebrow is-olive">Seguridad y licenciamiento</span>
+          <h2>Corre en el equipo. Sin nube, sin fugas de datos.</h2>
+          <p>La base de datos queda en la máquina de la unidad. La licencia se activa una sola vez, sin conexión, y queda atada al hardware del equipo.</p>
+          <ul class="ewr-panel-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Activación offline, atada a la huella de placa y procesador</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Licencia firmada digitalmente, con vigencia desde/hasta</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Control anti-retroceso de reloj para evitar licencias vencidas activas</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="ewr-section ewr-container" id="calidad">
+      <div class="ewr-section-head">
+        <span class="ewr-eyebrow">Ingeniería de software</span>
+        <h2>Construido con los criterios de calidad de la industria.</h2>
+        <p>No es una certificación formal: son los mismos marcos de referencia que usamos para decidir qué probar, qué no dejar pasar y cómo diseñar cada módulo.</p>
+      </div>
+      <div class="ewr-pain-grid">
+        <article class="ewr-pain">
+          <span class="ewr-pain-kicker is-accent">ISO/IEC 25010 · Calidad de software</span>
+          <h3>Fiabilidad, mantenibilidad y seguridad como criterio de diseño</h3>
+          <p>El modelo de características de calidad de ISO/IEC 25010 guía las decisiones de arquitectura: separar la lógica de negocio de la interfaz, evitar acoplamientos innecesarios, tratar cada error de forma explícita.</p>
+        </article>
+        <article class="ewr-pain">
+          <span class="ewr-pain-kicker is-accent">ISO/IEC/IEEE 29119 · Proceso de testing</span>
+          <h3>Cada flujo crítico tiene una prueba automatizada</h3>
+          <p>La importación, el cálculo de estado de mantenimiento y las operaciones sobre cuentas, unidades y efectos están cubiertas por pruebas automatizadas que se corren antes de cada entrega — no solo el camino feliz, también los casos de error.</p>
+        </article>
+        <article class="ewr-pain">
+          <span class="ewr-pain-kicker is-accent">Integridad de datos</span>
+          <h3>Ninguna importación queda a medio camino</h3>
+          <p>Cada importación corre dentro de una transacción: si algo falla, se revierte por completo. Nunca queda un dato a mitad de cargar.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="ewr-section ewr-container" id="contacto">
+      <div class="ewr-section-head">
+        <span class="ewr-eyebrow">Contacto</span>
+        <h2>Contanos quién sos y te escribimos por WhatsApp.</h2>
+        <p>Nombre, teléfono y unidad — con eso alcanza para arrancar. Al enviar, se abre WhatsApp con tu mensaje ya armado.</p>
+      </div>
+      <div class="ewr-contact-grid">
+        <form class="ewr-form" id="ewrForm">
+          <div class="ewr-field">
+            <label for="ewrNombre">Nombre y apellido</label>
+            <input type="text" id="ewrNombre" name="nombre" required placeholder="¿Con quién tenemos el gusto?">
+          </div>
+          <div class="ewr-field">
+            <label for="ewrTelefono">Teléfono</label>
+            <input type="tel" id="ewrTelefono" name="telefono" required placeholder="Tu número de contacto">
+          </div>
+          <div class="ewr-field ewr-field-wide">
+            <label for="ewrUnidad">Unidad militar</label>
+            <input type="text" id="ewrUnidad" name="unidad" required placeholder="Ej: Brigada de Logística II">
+          </div>
+          <div class="ewr-field ewr-field-wide">
+            <label for="ewrCantidad">Cantidad aproximada de equipos</label>
+            <input type="text" id="ewrCantidad" name="cantidad" placeholder="Opcional — ayuda a armar el presupuesto">
+          </div>
+          <div class="ewr-field ewr-field-wide">
+            <label for="ewrMensaje">Mensaje</label>
+            <textarea id="ewrMensaje" name="mensaje" rows="3" placeholder="Contanos qué necesitás (opcional)"></textarea>
+          </div>
+          <button type="submit" class="ewr-btn ewr-btn-solid ewr-field-wide ewr-form-submit">Enviar por WhatsApp</button>
+        </form>
+
+        <aside class="ewr-contact-info">
+          <h3>Otras formas de contacto</h3>
+          <a class="ewr-contact-line" href="https://wa.me/5493512539932?text=Hola%2C%20quiero%20informaci%C3%B3n%20sobre%20ExcelWarRoom." target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.66 15.02L2 22l5.13-1.31A10 10 0 1 0 12 2zm5.53 14.24c-.24.66-1.38 1.26-1.9 1.3-.5.05-1.03.26-3.42-.72-2.88-1.19-4.73-4.1-4.87-4.29-.14-.19-1.16-1.55-1.16-2.95s.73-2.09 1-2.38c.24-.26.54-.32.72-.32h.5c.16 0 .38-.03.58.44.24.57.8 1.98.87 2.12.07.14.11.31.02.5-.09.19-.14.31-.28.47-.14.16-.29.36-.42.48-.14.14-.28.29-.12.57.16.28.71 1.17 1.53 1.89 1.05.94 1.94 1.24 2.22 1.38.28.14.44.12.6-.07.16-.19.68-.79.86-1.06.18-.28.36-.23.6-.14.24.09 1.53.72 1.79.85.26.14.43.2.5.31.07.12.07.66-.17 1.32z"/></svg>
+            +54 9 351 253-9932
+          </a>
+          <a class="ewr-contact-line" href="mailto:acjuliocesarduarte@gmail.com">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="0"/><path d="M3 6l9 7 9-7"/></svg>
+            acjuliocesarduarte@gmail.com
+          </a>
+          <p class="ewr-contact-note">El correo es principalmente para el envío de comprobantes de pago. Para consultas y presupuestos, mejor por WhatsApp.</p>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="ewr-footer ewr-container">
+    <div class="ewr-brand">
+      <svg class="ewr-seal" viewBox="0 0 48 48" role="img" aria-hidden="true">
+        <circle cx="24" cy="24" r="22" fill="var(--ewr-bg-panel-2)" stroke="var(--ewr-blue)" stroke-width="2"/>
+        <text x="24" y="29" text-anchor="middle" font-family="var(--ewr-font-display)" font-size="14" fill="var(--ewr-blue-bright)">EW</text>
+      </svg>
+      <span>ExcelWarRoom — gestión de inventario para unidades operativas</span>
+    </div>
+    <div class="ewr-footer-links">
+      <a href="https://drive.google.com/drive/folders/1OfHLlCX8FF8tr-709j1pzQ2uczSXk68P?usp=drive_link" target="_blank" rel="noopener">Descargar el programa</a>
+      <a href="https://wa.me/5493512539932" target="_blank" rel="noopener">+54 9 351 253-9932</a>
+      <a href="mailto:acjuliocesarduarte@gmail.com">acjuliocesarduarte@gmail.com</a>
+    </div>
+  </footer>
+
+  <a class="ewr-float-wa" href="https://wa.me/5493512539932?text=Hola%2C%20quiero%20informaci%C3%B3n%20sobre%20ExcelWarRoom." target="_blank" rel="noopener" aria-label="Escribinos por WhatsApp" title="Escribinos por WhatsApp">
+    <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2a10 10 0 0 0-8.66 15.02L2 22l5.13-1.31A10 10 0 1 0 12 2zm5.53 14.24c-.24.66-1.38 1.26-1.9 1.3-.5.05-1.03.26-3.42-.72-2.88-1.19-4.73-4.1-4.87-4.29-.14-.19-1.16-1.55-1.16-2.95s.73-2.09 1-2.38c.24-.26.54-.32.72-.32h.5c.16 0 .38-.03.58.44.24.57.8 1.98.87 2.12.07.14.11.31.02.5-.09.19-.14.31-.28.47-.14.16-.29.36-.42.48-.14.14-.28.29-.12.57.16.28.71 1.17 1.53 1.89 1.05.94 1.94 1.24 2.22 1.38.28.14.44.12.6-.07.16-.19.68-.79.86-1.06.18-.28.36-.23.6-.14.24.09 1.53.72 1.79.85.26.14.43.2.5.31.07.12.07.66-.17 1.32z"/></svg>
+  </a>
+</div>
+
+<script>
+(function(){
+  var scope = document.querySelector('.ewr-landing');
+  if(!scope) return;
+
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var stats = scope.querySelectorAll('.ewr-stat-value[data-count]');
+
+  stats.forEach(function(el){
+    var target = parseInt(el.getAttribute('data-count'), 10) || 0;
+    if (reduced) { el.textContent = target.toLocaleString('es-ES'); return; }
+    var start = null, duration = 1100;
+    function step(ts){
+      if(!start) start = ts;
+      var progress = Math.min((ts - start) / duration, 1);
+      var eased = 1 - Math.pow(1 - progress, 3);
+      el.textContent = Math.round(eased * target).toLocaleString('es-ES');
+      if(progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+
+  scope.querySelectorAll('a[href^="#"]').forEach(function(link){
+    link.addEventListener('click', function(e){
+      var id = link.getAttribute('href').slice(1);
+      var target = document.getElementById(id);
+      if(!target) return;
+      e.preventDefault();
+      target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+    });
+  });
+
+  var form = scope.querySelector('#ewrForm');
+  if(form){
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var nombre = form.nombre.value.trim();
+      var telefono = form.telefono.value.trim();
+      var unidad = form.unidad.value.trim();
+      var cantidad = form.cantidad.value.trim();
+      var mensaje = form.mensaje.value.trim();
+
+      var partes = [
+        'Hola, soy ' + nombre + '.',
+        'Mi teléfono es ' + telefono + '.',
+        'Pertenezco a la unidad: ' + unidad + '.'
+      ];
+      if (cantidad) partes.push('Cantidad aproximada de equipos: ' + cantidad + '.');
+      if (mensaje) partes.push(mensaje);
+
+      var texto = encodeURIComponent(partes.join(' '));
+      window.open('https://wa.me/5493512539932?text=' + texto, '_blank', 'noopener');
+    });
+  }
+})();
+</script>
+</body>
+</html>
