@@ -100,22 +100,22 @@
 
   /* ================= TOPBAR ================= */
   .ewr-topbar{
-    position:relative;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:24px;
+    position:relative;z-index:3;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:clamp(10px,3vw,24px);
     padding-block:20px;border-bottom:1px solid var(--ewr-line);
   }
   .ewr-brand{display:flex;align-items:center;gap:12px;}
   .ewr-seal{width:38px;height:38px;flex:none;}
   .ewr-wordmark{font-family:var(--ewr-font-display);font-size:1.18rem;letter-spacing:.02em;}
   .ewr-wordmark strong{color:var(--ewr-blue-bright);}
-  .ewr-nav{display:flex;align-items:center;gap:clamp(16px,2.4vw,32px);}
-  .ewr-nav-links{display:flex;gap:clamp(14px,2vw,28px);}
+  .ewr-nav{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:clamp(10px,2.4vw,32px);}
+  .ewr-nav-links{display:none;gap:clamp(14px,2vw,28px);}
   .ewr-nav-links a{font-size:.9rem;color:var(--ewr-muted);white-space:nowrap;}
   .ewr-nav-links a:hover{color:var(--ewr-ink);}
-  @media (max-width:760px){.ewr-nav-links{display:none;}}
+  @media (min-width:761px){.ewr-nav-links{display:flex;}}
 
   .ewr-btn{
     display:inline-flex;align-items:center;justify-content:center;gap:.5em;
-    padding:.8em 1.5em;font-size:.92rem;font-weight:600;letter-spacing:.01em;
+    padding:.8em clamp(1em,3.5vw,1.5em);font-size:.92rem;font-weight:600;letter-spacing:.01em;
     border:1px solid transparent;white-space:nowrap;transition:box-shadow .2s,transform .2s;
   }
   .ewr-btn-solid{background:var(--ewr-gradient);color:#04141c;}
@@ -138,8 +138,8 @@
   .ewr-glow{position:absolute;z-index:0;pointer-events:none;border-radius:50%;filter:blur(6px);}
   .ewr-glow-a{width:520px;height:520px;right:-140px;top:-180px;background:radial-gradient(circle at center,rgba(49,193,239,.32),transparent 70%);}
   .ewr-glow-b{width:380px;height:380px;left:-120px;bottom:-160px;background:radial-gradient(circle at center,rgba(147,169,79,.24),transparent 70%);}
-  .ewr-hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(32px,5vw,64px);align-items:start;}
-  @media (max-width:900px){.ewr-hero-grid{grid-template-columns:1fr;}}
+  .ewr-hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1fr;gap:clamp(32px,5vw,64px);align-items:start;}
+  @media (min-width:901px){.ewr-hero-grid{grid-template-columns:1.05fr .95fr;}}
 
   .ewr-hero-copy{display:flex;flex-direction:column;gap:22px;padding-top:8px;}
   .ewr-hero-copy h1{font-size:clamp(2.15rem,4.4vw,3.35rem);line-height:1.08;}
@@ -192,7 +192,8 @@
   .ewr-donut-legend li{display:flex;align-items:center;justify-content:space-between;gap:10px;}
   .ewr-donut-pct{font-family:var(--ewr-font-mono);font-size:.78rem;color:var(--ewr-muted);font-variant-numeric:tabular-nums;flex:none;}
 
-  .ewr-mini-table{width:100%;border-collapse:collapse;font-size:.78rem;}
+  .ewr-table-scroll{overflow-x:auto;}
+  .ewr-mini-table{width:100%;min-width:280px;border-collapse:collapse;font-size:.78rem;}
   .ewr-mini-table th,.ewr-mini-table td{padding:8px 6px;border-bottom:1px solid var(--ewr-line);text-align:left;}
   .ewr-mini-table th{font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ewr-muted);font-weight:600;}
   .ewr-mini-table td.ewr-code{font-family:var(--ewr-font-mono);color:var(--ewr-blue-bright);white-space:nowrap;}
@@ -208,8 +209,8 @@
   .ewr-readout-note{font-size:.72rem;color:var(--ewr-muted);text-align:right;font-style:italic;}
 
   /* ================= PROBLEMA ================= */
-  .ewr-pain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ewr-line);border:1px solid var(--ewr-line);}
-  @media (max-width:860px){.ewr-pain-grid{grid-template-columns:1fr;}}
+  .ewr-pain-grid{display:grid;grid-template-columns:1fr;gap:1px;background:var(--ewr-line);border:1px solid var(--ewr-line);}
+  @media (min-width:861px){.ewr-pain-grid{grid-template-columns:repeat(3,1fr);}}
   .ewr-pain{background:var(--ewr-bg);padding:clamp(22px,3vw,32px);display:flex;flex-direction:column;gap:12px;}
   .ewr-pain-kicker{font-family:var(--ewr-font-mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ewr-critical);}
   .ewr-pain-kicker.is-accent{color:var(--ewr-blue);}
@@ -217,20 +218,23 @@
   .ewr-pain p{color:var(--ewr-muted);font-size:.95rem;}
 
   /* ================= PROCESO (secuencia real) ================= */
-  .ewr-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;position:relative;}
-  @media (max-width:860px){.ewr-steps{grid-template-columns:1fr;}}
-  .ewr-step{position:relative;padding:0 clamp(18px,2.4vw,28px) 0 0;display:flex;flex-direction:column;gap:10px;}
-  .ewr-step:not(:last-child){border-right:1px dashed var(--ewr-line);}
-  @media (max-width:860px){.ewr-step:not(:last-child){border-right:0;border-bottom:1px dashed var(--ewr-line);padding-bottom:24px;margin-bottom:24px;}}
+  .ewr-steps{display:grid;grid-template-columns:1fr;gap:0;position:relative;}
+  .ewr-step{position:relative;padding:0;display:flex;flex-direction:column;gap:10px;}
+  .ewr-step:not(:last-child){border-bottom:1px dashed var(--ewr-line);padding-bottom:24px;margin-bottom:24px;}
+  @media (min-width:861px){
+    .ewr-steps{grid-template-columns:repeat(3,1fr);}
+    .ewr-step{padding:0 clamp(18px,2.4vw,28px) 0 0;}
+    .ewr-step:not(:last-child){border-right:1px dashed var(--ewr-line);border-bottom:0;padding-bottom:0;margin-bottom:0;}
+  }
   .ewr-step-index{font-family:var(--ewr-font-mono);font-size:.75rem;color:var(--ewr-olive);display:flex;align-items:center;gap:10px;}
   .ewr-step-index::after{content:"";flex:1;height:1px;background:var(--ewr-line);}
   .ewr-step h3{font-size:1.15rem;}
   .ewr-step p{color:var(--ewr-muted);font-size:.94rem;}
 
   /* ================= FUNCIONALIDADES ================= */
-  .ewr-feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ewr-line);border:1px solid var(--ewr-line);}
-  @media (max-width:900px){.ewr-feature-grid{grid-template-columns:repeat(2,1fr);}}
-  @media (max-width:560px){.ewr-feature-grid{grid-template-columns:1fr;}}
+  .ewr-feature-grid{display:grid;grid-template-columns:1fr;gap:1px;background:var(--ewr-line);border:1px solid var(--ewr-line);}
+  @media (min-width:561px){.ewr-feature-grid{grid-template-columns:repeat(2,1fr);}}
+  @media (min-width:901px){.ewr-feature-grid{grid-template-columns:repeat(3,1fr);}}
   .ewr-feature{background:var(--ewr-bg);padding:clamp(22px,2.6vw,28px);display:flex;flex-direction:column;gap:12px;}
   .ewr-feature svg{width:22px;height:22px;color:var(--ewr-blue);}
   .ewr-feature h3{font-size:1.02rem;font-family:var(--ewr-font-body);font-weight:700;}
@@ -238,10 +242,10 @@
 
   /* ================= PANELES (presupuesto / seguridad) ================= */
   .ewr-panel{
-    display:grid;grid-template-columns:.7fr 1.3fr;gap:clamp(28px,4vw,48px);align-items:center;
-    background:var(--ewr-bg-panel);border:1px solid var(--ewr-line);padding:clamp(28px,4vw,44px);
+    display:grid;grid-template-columns:1fr;gap:clamp(28px,4vw,48px);align-items:center;
+    background:var(--ewr-bg-panel);border:1px solid var(--ewr-line);padding:clamp(28px,4vw,44px);text-align:left;
   }
-  @media (max-width:800px){.ewr-panel{grid-template-columns:1fr;text-align:left;}}
+  @media (min-width:801px){.ewr-panel{grid-template-columns:.7fr 1.3fr;}}
   .ewr-panel .ewr-seal{width:92px;height:92px;margin:0 auto;}
   .ewr-panel-copy{display:flex;flex-direction:column;gap:14px;}
   .ewr-panel-copy h2{font-size:clamp(1.4rem,2.2vw,1.8rem);}
@@ -252,10 +256,10 @@
   .ewr-panel-cta{margin-top:6px;}
 
   /* ================= CONTACTO / FORMULARIO ================= */
-  .ewr-contact-grid{display:grid;grid-template-columns:1.3fr .8fr;gap:clamp(24px,3vw,40px);align-items:start;}
-  @media (max-width:820px){.ewr-contact-grid{grid-template-columns:1fr;}}
-  .ewr-form{display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--ewr-bg-panel);border:1px solid var(--ewr-line);padding:clamp(20px,3vw,28px);}
-  @media (max-width:540px){.ewr-form{grid-template-columns:1fr;}}
+  .ewr-contact-grid{display:grid;grid-template-columns:1fr;gap:clamp(24px,3vw,40px);align-items:start;}
+  @media (min-width:821px){.ewr-contact-grid{grid-template-columns:1.3fr .8fr;}}
+  .ewr-form{display:grid;grid-template-columns:1fr;gap:16px;background:var(--ewr-bg-panel);border:1px solid var(--ewr-line);padding:clamp(20px,3vw,28px);}
+  @media (min-width:541px){.ewr-form{grid-template-columns:1fr 1fr;}}
   .ewr-field{display:flex;flex-direction:column;gap:6px;}
   .ewr-field-wide{grid-column:1/-1;}
   .ewr-field label{font-size:.74rem;text-transform:uppercase;letter-spacing:.07em;color:var(--ewr-muted);font-weight:600;}
@@ -396,28 +400,30 @@
               </ul>
             </div>
 
-            <table class="ewr-mini-table">
-              <thead>
-                <tr><th>Código</th><th>Unidad</th><th>Estado</th></tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="ewr-code">DEMO-04582</td>
-                  <td>Br. Log. II</td>
-                  <td><span class="ewr-pill is-good">Operativo</span></td>
-                </tr>
-                <tr>
-                  <td class="ewr-code">DEMO-11930</td>
-                  <td>Un. Transp. 4</td>
-                  <td><span class="ewr-pill is-warn">Atención</span></td>
-                </tr>
-                <tr>
-                  <td class="ewr-code">DEMO-07714</td>
-                  <td>Br. Log. II</td>
-                  <td><span class="ewr-pill is-critical">Crítico</span></td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="ewr-table-scroll">
+              <table class="ewr-mini-table">
+                <thead>
+                  <tr><th>Código</th><th>Unidad</th><th>Estado</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="ewr-code">DEMO-04582</td>
+                    <td>Br. Log. II</td>
+                    <td><span class="ewr-pill is-good">Operativo</span></td>
+                  </tr>
+                  <tr>
+                    <td class="ewr-code">DEMO-11930</td>
+                    <td>Un. Transp. 4</td>
+                    <td><span class="ewr-pill is-warn">Atención</span></td>
+                  </tr>
+                  <tr>
+                    <td class="ewr-code">DEMO-07714</td>
+                    <td>Br. Log. II</td>
+                    <td><span class="ewr-pill is-critical">Crítico</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
             <div class="ewr-readout-note">Datos ficticios, solo para fines de muestra visual.</div>
           </div>
         </aside>
