@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Seccional Número 6</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #0a1a2a;
+    color: #e8e8e8;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+  }
+  .wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+  }
+  h1 {
+    margin: 0 0 6px;
+    font-size: 22px;
+    letter-spacing: 3px;
+    color: #ffd700;
+    text-shadow: 0 0 8px #000;
+  }
+  #info {
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #aabbcc;
+    letter-spacing: 1px;
+  }
+  #game {
+    border: 3px solid #ffd700;
+    background: #87ceeb;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    box-shadow: 0 0 30px rgba(255,215,0,0.4);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>★ SECCIONAL NÚMERO 6 ★</h1>
+  <div id="info">← → MOVER &nbsp; | &nbsp; ↑/ESPACIO SALTAR (aplastar) &nbsp; | &nbsp; Z LANZAR SERPIENTE &nbsp; | &nbsp; R REINICIAR</div>
+  <canvas id="game" width="900" height="520"></canvas>
+</div>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+
+// Física
+const GRAVITY = 0.6;
+const FRICTION = 0.82;
+const SPEED = 4.6;
+const JUMP = -13.5;
+
+let score = 0;
+let lives = 3;
+let gameOver = false;
+let win = false;
+let cameraX = 0;
+let screenFlash = 0;
+let timeNow = 0;
+
+const player = {
+  x: 80, y: 300, w: 28, h: 46,
+  vx: 0, vy: 0,
+  onGround: false,
+  facing: 1,
+  frame: 0,
+  invuln: 0,
+  attackCooldown: 0,
+  onLion: true
+};
+
+const lion = {
+  x: 50, y: 320, w: 36, h: 26,
+  vx: 0, vy: 0,
+  facing: 1,
+  frame: 0,
+  tailAnim: 0,
+  defending: 0
+};
+
+const keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+});
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+const LEVEL_W = 4200;
+
+// Suelo con baches
+const platforms = [
+  { x: 0, y: 430, w: LEVEL_W, h: 90, type: 'ground' },
+  // Plataformas bajas
+  { x: 280, y: 360, w: 100, h: 20, type: 'plat' },
+  { x: 500, y: 300, w: 100, h: 20, type: 'plat' },
+  { x: 720, y: 360, w: 100, h: 20, type: 'plat' },
+  // Plataformas medias
+  { x: 1000, y: 280, w: 110, h: 20, type: 'plat' },
+  { x: 1200, y: 220, w: 110, h: 20, type: 'plat' },
+  { x: 1400, y: 280, w: 110, h: 20, type: 'plat' },
+  // Centro
+  { x: 1750, y: 310, w: 200, h: 20, type: 'plat' },
+  { x: 2000, y: 240, w: 150, h: 20, type: 'plat' },
+  { x: 2200, y: 310, w: 200, h: 20, type: 'plat' },
+  // Derecha
+  { x: 2600, y: 360, w: 100, h: 20, type: 'plat' },
+  { x: 2800, y: 300, w: 100, h: 20, type: 'plat' },
+  { x: 3000, y: 360, w: 100, h: 20, type: 'plat' },
+  // Final
+  { x: 3300, y: 280, w: 110, h: 20, type: 'plat' },
+  { x: 3500, y: 220, w: 110, h: 20, type: 'plat' },
+  { x: 3700, y: 280, w: 110, h: 20, type: 'plat' }
+];
+
+// Frases tontas de los fanáticos
+const enemyPhrases = [
+  '¡EL ESTADO SABE!',
+  '¡REGULEMOS TODO!',
+  '¡MÁS IMPUESTOS!',
+  '¡PROHIBAMOS ESO!',
+  '¡YO DECIDO POR VOS!',
+  '¡PLANIFICACIÓN!',
+  '¡ESTADO PRESENTE!',
+  '¡TU VIDA ES NUESTRA!',
+  '¡COLECTIVIZAR!',
+  '¡CONTROL DE PRECIOS!',
+  '¡POR EL PUEBLO!',
+  '¡NACIONALICEMOS!',
+  '¡CENSURAR!',
+  '¡SOMOS IGUALES!',
+  '¡SUBVENCIONES YA!',
+  '¡EL GOBIERNO CUIDA!',
+  '¡IGUALDAD FORZADA!',
+  '¡PLAN QUINQUENAL!',
+  '¡PROHIBIR LIBERTAD!',
+  '¡ESTATIZAR!'
+];
+
+const passionTypes = [
+  { name: 'Burocrata',   color: '#556070', shirt: '#4a4a55', hat: '#3a3a45' },
+  { name: 'Militante',   color: '#aa3030', shirt: '#8a2020', hat: '#6a1010' },
+  { name: 'Acaparador',  color: '#4a6a4a', shirt: '#3a5a3a', hat: '#2a4a2a' },
+  { name: 'Censurador',  color: '#7a3a7a', shirt: '#5a2a5a', hat: '#3a1a3a' },
+  { name: 'Interventor', color: '#8a6a3a', shirt: '#6a5a2a', hat: '#4a3a1a' },
+  { name: 'Colectivista',color: '#3a6a8a', shirt: '#2a5a7a', hat: '#1a3a5a' }
+];
+
+const enemyData = [
+  { x: 400,  y: 386, type: 0 },
+  { x: 700,  y: 386, type: 1 },
+  { x: 1050, y: 386, type: 2 },
+  { x: 1350, y: 386, type: 0 },
+  { x: 1600, y: 386, type: 3 },
+  { x: 1900, y: 386, type: 1 },
+  { x: 2200, y: 386, type: 4 },
+  { x: 2500, y: 386, type: 5 },
+  { x: 2750, y: 386, type: 0 },
+  { x: 3000, y: 386, type: 2 },
+  { x: 3250, y: 386, type: 3 },
+  { x: 3500, y: 386, type: 1 }
+];
+const enemies = enemyData.map(d => ({
+  x: d.x, y: d.y, w: 30, h: 40,
+  vx: (Math.random() < 0.5 ? -1 : 1) * 0.9,
+  vy: 0,
+  alive: true,
+  type: d.type,
+  originalX: d.x,
+  phrase: enemyPhrases[Math.floor(Math.random() * enemyPhrases.length)],
+  bubbleTimer: 0,
+  squashed: false,
+  squashedTimer: 0
+}));
+
+// Serpientes cascabel (proyectiles)
+const snakes = [];
+const particles = [];
+
+// Decoración
+const clouds = [];
+for (let i = 0; i < 14; i++) {
+  clouds.push({
+    x: Math.random() * LEVEL_W,
+    y: 30 + Math.random() * 120,
+    size: 0.7 + Math.random() * 0.6,
+    speed: 0.2 + Math.random() * 0.3
+  });
+}
+
+const trees = [];
+for (let i = 0; i < 18; i++) {
+  trees.push({
+    x: 150 + i * 220 + Math.random() * 80,
+    y: 350,
+    size: 30 + Math.random() * 25
+  });
+}
+
+// Banderas / estandartes
+const flags = [];
+for (let i = 0; i < 6; i++) {
+  flags.push({ x: 500 + i * 600, y: 280, color: i % 2 === 0 ? '#aa3030' : '#3a4a8a' });
+}
+
+function aabb(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x &&
+         a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function resetPlayer() {
+  player.x = 80; player.y = 300; player.vx = 0; player.vy = 0;
+  player.onGround = false; player.invuln = 0;
+  lion.x = 40; lion.y = 320; lion.vx = 0; lion.vy = 0;
+}
+
+function resetGame() {
+  score = 0; lives = 3; gameOver = false; win = false;
+  resetPlayer();
+  cameraX = 0;
+  enemies.forEach((e, i) => {
+    e.alive = true;
+    e.x = e.originalX;
+    e.y = enemyData[i].y;
+    e.vx = Math.sign(e.vx) * 0.9;
+    e.squashed = false;
+    e.squashedTimer = 0;
+    e.phrase = enemyPhrases[Math.floor(Math.random() * enemyPhrases.length)];
+  });
+  snakes.length = 0;
+  particles.length = 0;
+}
+
+function spawnParticles(x, y, color, count = 8) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 4,
+      vy: -Math.random() * 3 - 1,
+      life: 30 + Math.random() * 20,
+      color,
+      size: 2 + Math.random() * 2
+    });
+  }
+}
+
+function update() {
+  timeNow++;
+  if (keys['KeyR']) { resetGame(); return; }
+
+  if (gameOver || win) {
+    if (keys['Space'] || keys['Enter']) resetGame();
+    return;
+  }
+
+  // Input
+  if (keys['ArrowLeft']) { player.vx = -SPEED; player.facing = -1; }
+  else if (keys['ArrowRight']) { player.vx = SPEED; player.facing = 1; }
+  else { player.vx *= FRICTION; }
+
+  if ((keys['ArrowUp'] || keys['Space']) && player.onGround) {
+    player.vy = JUMP;
+    player.onGround = false;
+  }
+
+  if (player.attackCooldown > 0) player.attackCooldown--;
+  if (keys['KeyZ'] && player.attackCooldown === 0) {
+    snakes.push({
+      x: player.x + (player.facing > 0 ? player.w : -12),
+      y: player.y + 16,
+      vx: player.facing * 6,
+      segments: [],
+      life: 80
+    });
+    player.attackCooldown = 28;
+    screenFlash = 3;
+  }
+
+  // Gravedad jugador
+  player.vy += GRAVITY;
+  player.x += player.vx;
+  for (const p of platforms) {
+    if (aabb(player, p)) {
+      if (player.vx > 0) player.x = p.x - player.w;
+      else if (player.vx < 0) player.x = p.x + p.w;
+      player.vx = 0;
+    }
+  }
+  player.y += player.vy;
+  player.onGround = false;
+  for (const p of platforms) {
+    if (aabb(player, p)) {
+      if (player.vy > 0) {
+        player.y = p.y - player.h;
+        player.vy = 0;
+        player.onGround = true;
+      } else if (player.vy < 0) {
+        player.y = p.y + p.h;
+        player.vy = 0;
+      }
+    }
+  }
+
+  // León sigue al jugador
+  const targetX = player.x - 30;
+  const dx = targetX - lion.x;
+  lion.vx = Math.max(-3, Math.min(3, dx * 0.08));
+  if (lion.x < player.x) lion.facing = 1;
+  else lion.facing = -1;
+
+  lion.vy += GRAVITY;
+  lion.x += lion.vx;
+  for (const p of platforms) {
+    if (aabb(lion, p)) {
+      if (lion.vx > 0) lion.x = p.x - lion.w;
+      else if (lion.vx < 0) lion.x = p.x + lion.w;
+      lion.vx = 0;
+    }
+  }
+  lion.y += lion.vy;
+  for (const p of platforms) {
+    if (aabb(lion, p)) {
+      if (lion.vy > 0) {
+        lion.y = p.y - lion.h;
+        lion.vy = 0;
+      } else if (lion.vy < 0) {
+        lion.y = p.y + p.h;
+        lion.vy = 0;
+      }
+    }
+  }
+
+  if (player.invuln > 0) player.invuln--;
+
+  if (lion.defending > 0) lion.defending--;
+
+  // Límites
+  if (player.x < 0) player.x = 0;
+  if (player.x + player.w > LEVEL_W) player.x = LEVEL_W - player.w;
+  if (lion.x < 0) lion.x = 0;
+  if (lion.x + lion.w > LEVEL_W) lion.x = LEVEL_W - lion.w;
+
+  // Cámara
+  cameraX = player.x - W / 3;
+  if (cameraX < 0) cameraX = 0;
+  if (cameraX > LEVEL_W - W) cameraX = LEVEL_W - W;
+
+  if (player.y > H + 60) {
+    lives--;
+    if (lives <= 0) { gameOver = true; }
+    else resetPlayer();
+  }
+
+  // Serpientes
+  for (let i = snakes.length - 1; i >= 0; i--) {
+    const s = snakes[i];
+    s.x += s.vx;
+    s.life--;
+    s.segments.unshift({ x: s.x, y: s.y });
+    if (s.segments.length > 12) s.segments.pop();
+
+    if (s.life <= 0 || s.x < cameraX - 30 || s.x > cameraX + W + 30) {
+      snakes.splice(i, 1);
+      continue;
+    }
+
+    for (const e of enemies) {
+      if (!e.alive || e.squashed) continue;
+      if (aabb({ x: s.x - 6, y: s.y - 6, w: 12, h: 12 }, e)) {
+        e.alive = false;
+        score += 300;
+        spawnParticles(e.x + e.w / 2, e.y + e.h / 2, '#d4b48a', 12);
+        spawnParticles(e.x + e.w / 2, e.y + e.h / 2, '#8a6a3a', 6);
+        screenFlash = 3;
+        snakes.splice(i, 1);
+        break;
+      }
+    }
+  }
+
+  // Enemigos
+  for (const e of enemies) {
+    if (e.squashed) {
+      e.squashedTimer++;
+      if (e.squashedTimer > 60) e.squashed = false;
+      continue;
+    }
+    if (!e.alive) continue;
+
+    e.x += e.vx;
+    e.vy += GRAVITY;
+    e.y += e.vy;
+    for (const p of platforms) {
+      if (aabb(e, p) && e.vy >= 0) {
+        e.y = p.y - e.h;
+        e.vy = 0;
+      }
+    }
+    if (e.x < 0 || e.x + e.w > LEVEL_W) e.vx = -e.vx;
+
+    if (e.bubbleTimer > 0) e.bubbleTimer--;
+    else {
+      e.bubbleTimer = 180 + Math.random() * 120;
+    }
+
+    // Colisión con jugador
+    if (aabb(player, e) && player.invuln === 0) {
+      const pisoton = player.vy > 0 && (player.y + player.h - e.y) < 18;
+      if (pisoton) {
+        e.squashed = true;
+        e.squashedTimer = 0;
+        player.vy = -8;
+        score += 200;
+        spawnParticles(e.x + e.w / 2, e.y + e.h, '#aa3030', 10);
+        spawnParticles(e.x + e.w / 2, e.y + e.h, '#ffd700', 6);
+      } else {
+        lives--;
+        player.invuln = 90;
+        if (lives <= 0) { gameOver = true; }
+        else {
+          player.vx = (player.x < e.x) ? -6 : 6;
+          player.vy = -6;
+        }
+      }
+    }
+
+    // Colisión con el león (defensa por la espalda)
+    if (aabb(lion, e) && lion.defending === 0) {
+      lion.defending = 30;
+      e.vx = (e.x < lion.x) ? -4 : 4;
+      e.vy = -5;
+      spawnParticles(e.x + e.w / 2, e.y + e.h / 2, '#d4b48a', 6);
+    }
+  }
+
+  // Partículas
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.15;
+    p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  player.frame += 0.25;
+  lion.frame += 0.2;
+  lion.tailAnim += 0.2;
+
+  if (enemies.every(e => !e.alive)) {
+    win = true;
+  }
+
+  if (screenFlash > 0) screenFlash--;
+}
+
+// ---- Dibujo ----
+
+function drawBackground() {
+  // Cielo
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#5cb6ff');
+  grad.addColorStop(0.6, '#87ceeb');
+  grad.addColorStop(1, '#c8e0f0');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Sol
+  const sunX = 700 - cameraX * 0.1;
+  ctx.fillStyle = '#fff5b0';
+  ctx.beginPath();
+  ctx.arc(sunX, 80, 36, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffe060';
+  ctx.beginPath();
+  ctx.arc(sunX, 80, 26, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Montañas
+  ctx.fillStyle = '#5a7a9a';
+  for (let i = 0; i < 8; i++) {
+    const mx = i * 500 - (cameraX * 0.2) - 100;
+    const mh = 80 + (i % 3) * 30;
+    ctx.beginPath();
+    ctx.moveTo(mx, 430);
+    ctx.lineTo(mx + 200, 430 - mh);
+    ctx.lineTo(mx + 400, 430);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.fillStyle = '#3a5a7a';
+  for (let i = 0; i < 8; i++) {
+    const mx = i * 500 - (cameraX * 0.3) + 200;
+    const mh = 60 + (i % 2) * 20;
+    ctx.beginPath();
+    ctx.moveTo(mx, 430);
+    ctx.lineTo(mx + 150, 430 - mh);
+    ctx.lineTo(mx + 300, 430);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Nubes
+  for (const c of clouds) {
+    const cx = c.x - cameraX * 0.4;
+    if (cx > -100 && cx < W + 100) {
+      const cy = c.y;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 18 * c.size, 0, Math.PI * 2);
+      ctx.arc(cx + 22 * c.size, cy - 8, 22 * c.size, 0, Math.PI * 2);
+      ctx.arc(cx + 44 * c.size, cy, 18 * c.size, 0, Math.PI * 2);
+      ctx.arc(cx + 22 * c.size, cy + 6, 18 * c.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    c.x += c.speed;
+    if (c.x > LEVEL_W + 200) c.x = -200;
+  }
+}
+
+function drawTree(t) {
+  const x = t.x - cameraX;
+  if (x < -50 || x > W + 50) return;
+  // Tronco
+  ctx.fillStyle = '#5a3a1a';
+  ctx.fillRect(x - 4, t.y - t.size, 8, t.size);
+  // Copa
+  ctx.fillStyle = '#3a8a3a';
+  ctx.beginPath();
+  ctx.arc(x, t.y - t.size, t.size * 0.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#5aaa5a';
+  ctx.beginPath();
+  ctx.arc(x - 5, t.y - t.size - 5, t.size * 0.4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawFlag(f) {
+  const x = f.x - cameraX;
+  if (x < -30 || x > W + 30) return;
+  // Asta
+  ctx.fillStyle = '#3a2a1a';
+  ctx.fillRect(x, f.y - 80, 3, 80);
+  // Bandera (libertad)
+  ctx.fillStyle = '#1a3a8a';
+  ctx.beginPath();
+  ctx.moveTo(x + 3, f.y - 80);
+  ctx.lineTo(x + 30, f.y - 72);
+  ctx.lineTo(x + 3, f.y - 64);
+  ctx.closePath();
+  ctx.fill();
+  // Estrella
+  ctx.fillStyle = '#ffd700';
+  ctx.beginPath();
+  ctx.arc(x + 12, f.y - 72, 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawPlatform(p) {
+  const x = Math.round(p.x - cameraX);
+  if (x + p.w < 0 || x > W) return;
+  const y = p.y;
+
+  if (p.type === 'ground') {
+    // Pasto
+    ctx.fillStyle = '#5ac84a';
+    ctx.fillRect(x, y, p.w, 12);
+    ctx.fillStyle = '#3a9a3a';
+    ctx.fillRect(x, y + 12, p.w, 3);
+    // Tierra
+    ctx.fillStyle = '#8a5a2a';
+    ctx.fillRect(x, y + 15, p.w, p.h - 15);
+    // Textura de tierra
+    ctx.fillStyle = '#6a4a1a';
+    for (let i = 0; i < p.w; i += 30) {
+      ctx.fillRect(x + i + 5, y + 20, 4, 2);
+      ctx.fillRect(x + i + 15, y + 35, 4, 2);
+      ctx.fillRect(x + i + 22, y + 55, 4, 2);
+    }
+  } else if (p.type === 'plat') {
+    // Plataforma de piedra
+    ctx.fillStyle = '#7a6a5a';
+    ctx.fillRect(x, y, p.w, p.h);
+    ctx.fillStyle = '#a08a6a';
+    ctx.fillRect(x, y, p.w, 3);
+    ctx.fillStyle = '#5a4a3a';
+    ctx.fillRect(x, y + p.h - 2, p.w, 2);
+    // Textura
+    ctx.fillStyle = '#5a4a3a';
+    ctx.fillRect(x + 5, y + 5, 3, 3);
+    ctx.fillRect(x + p.w - 10, y + 8, 3, 3);
+  }
+}
+
+function drawPlayer() {
+  const x = Math.round(player.x - cameraX);
+  const y = Math.round(player.y);
+
+  if (player.invuln > 0 && Math.floor(player.invuln / 5) % 2 === 0) return;
+
+  // Sombra
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  ctx.beginPath();
+  ctx.ellipse(x + player.w / 2, y + player.h + 2, player.w / 2, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Piernas
+  ctx.fillStyle = '#1a2a5a';
+  if (player.onGround && Math.abs(player.vx) > 0.5) {
+    const off = Math.round(Math.sin(player.frame * 3) * 3);
+    ctx.fillRect(x + 7, y + 36, 6, 10 + off);
+    ctx.fillRect(x + 15, y + 36, 6, 10 - off);
+  } else {
+    ctx.fillRect(x + 7, y + 36, 6, 10);
+    ctx.fillRect(x + 15, y + 36, 6, 10);
+  }
+  // Botas
+  ctx.fillStyle = '#3a2a1a';
+  ctx.fillRect(x + 5, y + 44, 9, 3);
+  ctx.fillRect(x + 14, y + 44, 9, 3);
+
+  // Cuerpo (camisa azul clara)
+  ctx.fillStyle = '#5a8acc';
+  ctx.fillRect(x + 5, y + 22, 18, 16);
+  ctx.fillStyle = '#3a6aaa';
+  ctx.fillRect(x + 5, y + 22, 18, 2);
+  ctx.fillStyle = '#7aaae8';
+  ctx.fillRect(x + 5, y + 30, 4, 8);
+
+  // Chaleco (símbolo de libertad: G de Gadafi? No, mejor "V" de Vida/Libertad/Propiedad)
+  // Usamos un símbolo de balanza
+  ctx.fillStyle = '#2a2a2a';
+  ctx.fillRect(x + 12, y + 26, 4, 8);
+  ctx.fillStyle = '#ffd700';
+  ctx.fillRect(x + 8, y + 25, 12, 2);
+  ctx.fillRect(x + 8, y + 31, 12, 2);
+  ctx.fillStyle = '#ffd700';
+  ctx.fillRect(x + 6, y + 22, 3, 8);
+  ctx.fillRect(x + 19, y + 22, 3, 8);
+  ctx.fillRect(x + 5, y + 22, 5, 2);
+  ctx.fillRect(x + 18, y + 22, 5, 2);
+
+  // Cabeza
+  ctx.fillStyle = '#f4d4a8';
+  ctx.fillRect(x + 5, y + 4, 18, 18);
+  // Cabello castaño
+  ctx.fillStyle = '#5a3a1a';
+  ctx.fillRect(x + 4, y + 2, 20, 7);
+  ctx.fillStyle = '#3a2a0a';
+  ctx.fillRect(x + 4, y + 2, 20, 2);
+  ctx.fillStyle = '#7a4a2a';
+  ctx.fillRect(x + 4, y + 7, 3, 2);
+  ctx.fillRect(x + 21, y + 7, 3, 2);
+
+  // Ojos
+  ctx.fillStyle = '#fff';
+  if (player.facing > 0) {
+    ctx.fillRect(x + 16, y + 10, 4, 4);
+    ctx.fillStyle = '#1a4a2a';
+    ctx.fillRect(x + 18, y + 11, 2, 3);
+  } else {
+    ctx.fillRect(x + 8, y + 10, 4, 4);
+    ctx.fillStyle = '#1a4a2a';
+    ctx.fillRect(x + 10, y + 11, 2, 3);
+  }
+  // Ceja determinada
+  ctx.fillStyle = '#3a2a1a';
+  if (player.facing > 0) {
+    ctx.fillRect(x + 15, y + 8, 6, 1);
+  } else {
+    ctx.fillRect(x + 7, y + 8, 6, 1);
+  }
+  // Sonrisa
+  ctx.fillStyle = '#000';
+  ctx.fillRect(x + 11, y + 17, 6, 1);
+
+  // Brazo
+  ctx.fillStyle = '#f4d4a8';
+  if (player.facing > 0) {
+    ctx.fillRect(x + 22, y + 24, 4, 8);
+  } else {
+    ctx.fillRect(x + 2, y + 24, 4, 8);
+  }
+}
+
+function drawLion() {
+  const x = Math.round(lion.x - cameraX);
+  const y = Math.round(lion.y);
+
+  // Sombra
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.beginPath();
+  ctx.ellipse(x + lion.w / 2, y + lion.h + 2, lion.w / 2, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Cuerpo
+  ctx.fillStyle = '#d4a040';
+  ctx.fillRect(x + 4, y + 8, lion.w - 8, lion.h - 8);
+  ctx.fillStyle = '#e8b860';
+  ctx.fillRect(x + 4, y + 8, lion.w - 8, 4);
+
+  // Patas
+  ctx.fillStyle = '#a87830';
+  const off = Math.round(Math.sin(lion.frame * 3) * 2);
+  ctx.fillRect(x + 4, y + lion.h - 6, 4, 6);
+  ctx.fillRect(x + 12, y + lion.h - 6 + off, 4, 6 - off);
+  ctx.fillRect(x + 20, y + lion.h - 6 - off, 4, 6 + off);
+  ctx.fillRect(x + 28, y + lion.h - 6, 4, 6);
+
+  // Cabeza
+  ctx.fillStyle = '#e8b860';
+  ctx.fillRect(x, y + 2, 14, 14);
+  ctx.fillStyle = '#d4a040';
+  ctx.fillRect(x, y + 2, 14, 3);
+
+  // Melena
+  ctx.fillStyle = '#8a5a20';
+  ctx.beginPath();
+  ctx.arc(x + 4, y + 6, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#a87830';
+  for (let i = 0; i < 6; i++) {
+    const ang = (i / 6) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(x + 4 + Math.cos(ang) * 6, y + 6 + Math.sin(ang) * 6, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Cara
+  ctx.fillStyle = '#e8b860';
+  ctx.fillRect(x + 6, y + 6, 6, 8);
+  // Ojos
+  ctx.fillStyle = '#1a3a2a';
+  if (lion.facing > 0) {
+    ctx.fillRect(x + 9, y + 8, 2, 2);
+  } else {
+    ctx.fillRect(x + 6, y + 8, 2, 2);
+  }
+  // Nariz
+  ctx.fillStyle = '#3a2a1a';
+  if (lion.facing > 0) {
+    ctx.fillRect(x + 11, y + 10, 2, 2);
+  } else {
+    ctx.fillRect(x + 5, y + 10, 2, 2);
+  }
+  // Boca
+  ctx.fillStyle = '#3a2a1a';
+  ctx.fillRect(x + 8, y + 12, 4, 1);
+
+  // Cola
+  ctx.fillStyle = '#d4a040';
+  const tailWag = Math.sin(lion.tailAnim) * 4;
+  ctx.fillRect(x + lion.w - 4, y + 4, 4, 2);
+  ctx.fillRect(x + lion.w - 2 + tailWag, y, 2, 6);
+  ctx.fillStyle = '#8a5a20';
+  ctx.fillRect(x + lion.w - 4 + tailWag, y - 2, 4, 4);
+
+  // Brillo si está defendiendo
+  if (lion.defending > 0) {
+    ctx.strokeStyle = 'rgba(255, 215, 0, ' + (lion.defending / 30) + ')';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - 4, y - 4, lion.w + 8, lion.h + 8);
+  }
+}
+
+function drawEnemy(e) {
+  if (!e.alive && !e.squashed) return;
+  const x = Math.round(e.x - cameraX);
+  const y = Math.round(e.y);
+  const passion = passionTypes[e.type];
+
+  if (e.squashed) {
+    // Enemigo aplastado
+    ctx.fillStyle = passion.color;
+    const squashY = y + e.h - 6;
+    ctx.beginPath();
+    ctx.ellipse(x + e.w / 2, squashY, e.w / 2, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffd700';
+    ctx.fillText('✦', x + 6, squashY - 2);
+    ctx.fillText('✦', x + e.w - 12, squashY - 2);
+    return;
+  }
+
+  // Sombra
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.beginPath();
+  ctx.ellipse(x + e.w / 2, y + e.h + 2, e.w / 2, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Aura sutil roja
+  if (e.bubbleTimer > 60) {
+    ctx.fillStyle = 'rgba(170, 50, 50, 0.15)';
+    ctx.fillRect(x - 4, y - 4, e.w + 8, e.h + 8);
+  }
+
+  // Piernas
+  ctx.fillStyle = '#2a2a2a';
+  ctx.fillRect(x + 6, y + 32, 5, 8);
+  ctx.fillRect(x + 19, y + 32, 5, 8);
+
+  // Cuerpo (camisa)
+  ctx.fillStyle = passion.shirt;
+  ctx.fillRect(x + 4, y + 16, e.w - 8, 18);
+  ctx.fillStyle = passion.color;
+  ctx.fillRect(x + 4, y + 16, e.w - 8, 3);
+  // Símbolo de hoz y martillo falso
+  ctx.fillStyle = '#ffd700';
+  ctx.fillRect(x + 13, y + 20, 2, 8);
+  ctx.fillRect(x + 11, y + 24, 6, 2);
+
+  // Cabeza
+  ctx.fillStyle = '#d4b48a';
+  ctx.fillRect(x + 6, y + 4, 18, 14);
+  // Gorro/boina
+  ctx.fillStyle = passion.hat;
+  ctx.fillRect(x + 4, y + 0, 22, 8);
+  ctx.fillRect(x + 6, y + 6, 18, 3);
+  // Estrellita en el gorro
+  ctx.fillStyle = '#ffd700';
+  ctx.fillRect(x + 13, y + 2, 4, 4);
+
+  // Ojos fanatizados (blancos)
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(x + 9, y + 8, 4, 4);
+  ctx.fillRect(x + 17, y + 8, 4, 4);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(x + 10, y + 9, 2, 2);
+  ctx.fillRect(x + 18, y + 9, 2, 2);
+  // Boca gritando
+  ctx.fillStyle = '#000';
+  ctx.fillRect(x + 11, y + 14, 8, 2);
+
+  // Globo de diálogo con la frase
+  if (e.bubbleTimer > 90) {
+    drawSpeechBubble(x + e.w / 2, y - 8, e.phrase, passion.color);
+  }
+}
+
+function drawSpeechBubble(cx, cy, text, color) {
+  ctx.font = 'bold 9px monospace';
+  const w = ctx.measureText(text).width + 12;
+  const h = 18;
+  const bx = cx - w / 2;
+  const by = cy - h;
+
+  // Cola del globo
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.moveTo(cx - 4, by + h);
+  ctx.lineTo(cx, by + h + 6);
+  ctx.lineTo(cx + 4, by + h);
+  ctx.closePath();
+  ctx.fill();
+
+  // Globo
+  ctx.fillStyle = '#fff';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.fillRect(bx, by, w, h);
+  ctx.strokeRect(bx, by, w, h);
+
+  // Texto
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, cx, by + h / 2);
+  ctx.textBaseline = 'alphabetic';
+}
+
+function drawSnake(s) {
+  // Dibujar la serpiente con segmentos (cuerpo ondulante)
+  for (let i = s.segments.length - 1; i >= 0; i--) {
+    const seg = s.segments[i];
+    const sx = Math.round(seg.x - cameraX);
+    const sy = seg.y + Math.sin((timeNow + i * 3) * 0.3) * 3;
+    const size = 7 - i * 0.3;
+    if (size < 2) continue;
+    ctx.fillStyle = i === 0 ? '#6a8a3a' : '#7a9a4a';
+    ctx.fillRect(sx - size / 2, sy - size / 2, size, size);
+    // Patrón de diamante
+    if (i % 2 === 0) {
+      ctx.fillStyle = '#3a5a1a';
+      ctx.fillRect(sx - size / 2 + 1, sy - size / 2 + 1, 2, 2);
+    }
+  }
+  // Cabeza con ojos
+  const hx = Math.round(s.x - cameraX);
+  const hy = s.y;
+  ctx.fillStyle = '#6a8a3a';
+  ctx.beginPath();
+  ctx.ellipse(hx, hy, 7, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Ojos
+  ctx.fillStyle = '#ff3030';
+  ctx.fillRect(hx - 3, hy - 2, 2, 2);
+  ctx.fillRect(hx + 1, hy - 2, 2, 2);
+  // Lengua
+  if (Math.floor(timeNow / 5) % 2 === 0) {
+    ctx.fillStyle = '#cc3030';
+    ctx.fillRect(hx + (s.vx > 0 ? 6 : -8), hy - 1, 4, 1);
+  }
+  // Cascabel
+  if (s.segments.length > 0) {
+    const tail = s.segments[s.segments.length - 1];
+    const tx = Math.round(tail.x - cameraX);
+    const ty = tail.y;
+    ctx.fillStyle = '#a08040';
+    ctx.fillRect(tx - 3, ty - 3, 6, 6);
+    ctx.fillStyle = '#604020';
+    ctx.fillRect(tx - 2, ty - 2, 1, 4);
+    ctx.fillRect(tx + 1, ty - 2, 1, 4);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const alpha = p.life / 50;
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = Math.max(0, alpha);
+    ctx.fillRect(p.x - cameraX, p.y, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawHUD() {
+  // Marco
+  ctx.fillStyle = 'rgba(20, 30, 50, 0.85)';
+  ctx.fillRect(0, 0, W, 90);
+  ctx.fillStyle = '#ffd700';
+  ctx.fillRect(0, 88, W, 2);
+
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 18px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('★ SCORE   ' + String(score).padStart(6, '0'), 16, 30);
+  ctx.fillText('★ VIDAS   ' + lives, 16, 58);
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#aabbcc';
+  ctx.font = '13px monospace';
+  ctx.fillText('FANÁTICOS RESTANTES: ' + enemies.filter(e => e.alive).length + ' / ' + enemies.length, W / 2, 30);
+  ctx.fillStyle = '#aabbcc';
+  ctx.font = '11px monospace';
+  ctx.fillText('Aprieta Z para lanzar tu serpiente de cascabel', W / 2, 58);
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 16px monospace';
+  ctx.fillText('✦ LIBERTAD ✦', W - 16, 30);
+  ctx.fillStyle = '#aabbcc';
+  ctx.font = '11px monospace';
+  ctx.fillText('Vida, Libertad y Propiedad', W - 16, 56);
+
+  if (screenFlash > 0) {
+    ctx.fillStyle = 'rgba(255, 255, 200, ' + (screenFlash / 6) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  if (gameOver) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#aa3030';
+    ctx.font = 'bold 48px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('★ EL ESTADO VENCIÓ ★', W / 2, H / 2 - 40);
+    ctx.font = '20px monospace';
+    ctx.fillStyle = '#cccccc';
+    ctx.fillText('La libertad ha sido aplastada', W / 2, H / 2 + 10);
+    ctx.font = '16px monospace';
+    ctx.fillText('ESPACIO para volver a empezar', W / 2, H / 2 + 50);
+  }
+
+  if (win) {
+    ctx.fillStyle = 'rgba(10, 20, 40, 0.9)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 44px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('✦ ¡VIVA LA LIBERTAD! ✦', W / 2, H / 2 - 50);
+    ctx.font = '20px monospace';
+    ctx.fillStyle = '#e8e8e8';
+    ctx.fillText('Has aplastado a todos los fanáticos', W / 2, H / 2 - 10);
+    ctx.fillText('Puntaje final: ' + score, W / 2, H / 2 + 20);
+    ctx.font = '14px monospace';
+    ctx.fillText('ESPACIO para reiniciar', W / 2, H / 2 + 60);
+  }
+}
+
+function draw() {
+  drawBackground();
+  for (const t of trees) drawTree(t);
+  for (const f of flags) drawFlag(f);
+  for (const p of platforms) drawPlatform(p);
+  for (const s of snakes) drawSnake(s);
+  for (const e of enemies) drawEnemy(e);
+  drawParticles();
+  drawLion();
+  drawPlayer();
+  drawHUD();
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
